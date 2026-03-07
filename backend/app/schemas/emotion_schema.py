@@ -22,11 +22,10 @@ class EmotionPrediction(BaseModel):
     top_emotion: str
     confidence: float = Field(..., ge=0.0, le=1.0)
     scores: Dict[str, float]
-    provider: str
 
 
-class FaceEmotionResponse(BaseModel):
-    face: EmotionPrediction
+class FaceEmotionResponse(EmotionPrediction):
+    pass
 
 
 class SpeechEmotionResponse(BaseModel):
