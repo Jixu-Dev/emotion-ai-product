@@ -1,0 +1,5 @@
+{
+  "name": "SentientPro",
+  "description": "Biometric Intelligence Engine using Gemini AI",
+  "requestFramePermissions": ["camera", "microphone"]
+}
