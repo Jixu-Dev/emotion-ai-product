@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.config import get_settings
 from app.schemas.emotion_schema import (
@@ -27,9 +27,14 @@ insight_service = InsightService()
 
 @router.post("/face", response_model=FaceEmotionResponse)
 def analyze_face_emotion(payload: FaceEmotionRequest) -> FaceEmotionResponse:
-    image = decode_base64_image(payload.image_base64)
-    prediction = face_service.analyze(image)
-    return FaceEmotionResponse(face=prediction)
+    try:
+        image = decode_base64_image(payload.image_base64)
+        prediction = face_service.analyze(image)
+        return FaceEmotionResponse(**prediction)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail="Failed to process face emotion request") from exc
 
 
 @router.post("/speech", response_model=SpeechEmotionResponse)

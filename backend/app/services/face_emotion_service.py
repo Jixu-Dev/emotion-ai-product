@@ -2,6 +2,7 @@ import logging
 from typing import Dict
 
 import numpy as np
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +25,38 @@ class FaceEmotionService:
 
     def analyze(self, image: np.ndarray) -> Dict[str, object]:
         if not self._is_available or self._deepface is None:
-            return {
-                "top_emotion": "neutral",
-                "confidence": 0.0,
-                "scores": {"neutral": 1.0},
-                "provider": f"{self.provider_name}-unavailable",
-            }
+            raise HTTPException(status_code=503, detail="Face emotion service is unavailable")
 
-        result = self._deepface.analyze(img_path=image, actions=["emotion"], enforce_detection=False)
-        if isinstance(result, list):
-            result = result[0]
+        try:
+            # DeepFace can return either a dict or a list[dict] depending on the version.
+            result = self._deepface.analyze(image, actions=["emotion"], enforce_detection=False)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("DeepFace analysis failed")
+            raise HTTPException(status_code=500, detail="Failed to analyze face emotion") from exc
 
-        emotions = {k: float(v) / 100.0 for k, v in result["emotion"].items()}
-        top_emotion = max(emotions, key=emotions.get)
+        if isinstance(result, dict):
+            result = [result]
+
+        if not isinstance(result, list) or not result or not isinstance(result[0], dict):
+            raise HTTPException(status_code=422, detail="Invalid response returned by DeepFace")
+
+        analyzed_face = result[0]
+        emotion_scores = analyzed_face.get("emotion")
+        top_emotion = analyzed_face.get("dominant_emotion")
+
+        if not isinstance(emotion_scores, dict) or not emotion_scores:
+            raise HTTPException(status_code=422, detail="DeepFace did not return emotion scores")
+
+        scores = {str(label): float(value) for label, value in emotion_scores.items()}
+
+        if not top_emotion or str(top_emotion) not in scores:
+            top_emotion = max(scores, key=scores.get)
+
+        top_emotion = str(top_emotion)
+        confidence = float(scores[top_emotion]) / 100.0
 
         return {
             "top_emotion": top_emotion,
-            "confidence": float(emotions[top_emotion]),
-            "scores": emotions,
-            "provider": self.provider_name,
+            "confidence": confidence,
+            "scores": scores,
         }
