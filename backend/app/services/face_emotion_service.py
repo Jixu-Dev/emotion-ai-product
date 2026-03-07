@@ -40,20 +40,12 @@ class FaceEmotionService:
         if not isinstance(result, list) or not result or not isinstance(result[0], dict):
             raise HTTPException(status_code=422, detail="Invalid response returned by DeepFace")
 
-        analyzed_face = result[0]
-        emotion_scores = analyzed_face.get("emotion")
-        top_emotion = analyzed_face.get("dominant_emotion")
-
-        if not isinstance(emotion_scores, dict) or not emotion_scores:
-            raise HTTPException(status_code=422, detail="DeepFace did not return emotion scores")
+        emotion_scores = result[0]["emotion"]
+        top_emotion = result[0]["dominant_emotion"]
 
         scores = {str(label): float(value) for label, value in emotion_scores.items()}
 
-        if not top_emotion or str(top_emotion) not in scores:
-            top_emotion = max(scores, key=scores.get)
-
-        top_emotion = str(top_emotion)
-        confidence = float(scores[top_emotion]) / 100.0
+        confidence = scores[top_emotion] / 100
 
         return {
             "top_emotion": top_emotion,
